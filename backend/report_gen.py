@@ -50,7 +50,7 @@ def extract_fields(text):
     
     try:
         response = client.interactions.create(
-            model='gemini-3.1-pro-preview',
+            model='gemini-3.7-flash',
             input=prompt
         )
         response_text = response.output_text.strip()
@@ -110,6 +110,12 @@ def generate_report(file_path):
     print("Building Word document...")
     doc = Document()
     
+    # Set default font
+    style = doc.styles['Normal']
+    font = style.font
+    font.name = 'Calibri'
+    font.size = Pt(11)
+    
     # Title
     sub_name = fields.get('subsidiary_name', 'Unknown Subsidiary')
     report_year = fields.get('report_year', 'Unknown Year')
@@ -121,13 +127,14 @@ def generate_report(file_path):
     subtitle.runs[0].bold = True
     subtitle.runs[0].font.size = Pt(14)
     
-    doc.add_page_break()
+    # Removed page break so the first page isn't left blank
+    doc.add_paragraph()
     
     # Executive Summary
-    doc.add_heading("1. Executive Summary", level=1)
+    h1 = doc.add_heading("1. Executive Summary", level=1)
+    h1.paragraph_format.page_break_before = False
     exec_sum = fields.get('executive_summary', 'N/A')
     p = doc.add_paragraph(str(exec_sum))
-    p.style = 'Intense Quote'
     
     doc.add_heading("Key Highlights", level=2)
     highlights = fields.get('key_highlights', [])
@@ -137,12 +144,19 @@ def generate_report(file_path):
     else:
         doc.add_paragraph(str(highlights))
         
+    doc.add_paragraph()
+    
     # Operational Metrics (Table)
     doc.add_heading("2. Operational and Production Metrics", level=1)
     metrics = fields.get('operational_and_production_metrics', [])
     if isinstance(metrics, list) and metrics:
         table = doc.add_table(rows=1, cols=6)
-        table.style = 'Table Grid'
+        # Using a much cleaner, professional table style
+        try:
+            table.style = 'Light Shading Accent 1'
+        except KeyError:
+            table.style = 'Table Grid' # Fallback
+            
         hdr_cells = table.rows[0].cells
         headers = ['Category', 'Metric', 'Value', 'Unit', 'YoY Change', 'Notes']
         for i, header in enumerate(headers):
@@ -160,7 +174,7 @@ def generate_report(file_path):
     else:
         doc.add_paragraph("No operational metrics available.")
         
-    doc.add_page_break()
+    doc.add_paragraph() # Replaced page break with a paragraph space
         
     # Financial Overview
     doc.add_heading("3. Financial Overview", level=1)
