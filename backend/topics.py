@@ -60,20 +60,60 @@ def generate_topics(data_folder):
     topic_info = topic_model.get_topic_info()
     topics_list = []
     
-    # Iterate through each topic (excluding outliers which is typically -1)
+    # Step 1: Collect keywords for all valid topics to batch prompt the LLM
+    topics_to_name = {}
+    for topic_id in topic_info['Topic']:
+        if topic_id == -1:
+            continue
+        keywords = topic_model.get_topic(topic_id)
+        if keywords:
+            word_list = [word for word, prob in keywords]
+            topics_to_name[int(topic_id)] = word_list[:6] # Send top 6 words for context
+            
+    # Step 2: Use LLM to generate human-readable titles
+    generated_names = {}
+    if topics_to_name:
+        from llm_utils import call_gemini_with_fallback
+        prompt = (
+            "You are an expert at identifying the core theme from a list of keywords. "
+            "Given the following topic IDs and their keywords, generate a short, highly readable, "
+            "and professional title (1 to 4 words max) for each topic. "
+            "Respond ONLY with a valid JSON object where keys are the topic IDs (as strings) "
+            "and values are the generated titles. Do not include markdown code blocks or any other text.\n\n"
+            f"Topics:\n{json.dumps(topics_to_name, indent=2)}"
+        )
+        try:
+            print("Calling LLM to generate readable topic headings...")
+            llm_response = call_gemini_with_fallback(prompt)
+            text = llm_response.get("text", "").strip()
+            # Clean up potential markdown formatting
+            if text.startswith("```json"): text = text[7:]
+            if text.startswith("```"): text = text[3:]
+            if text.endswith("```"): text = text[:-3]
+            
+            generated_names = json.loads(text.strip())
+        except Exception as e:
+            print(f"Error generating topic titles via LLM: {e}")
+            generated_names = {}
+
+    # Step 3: Build the final topics list
     for topic_id in topic_info['Topic']:
         if topic_id == -1:
             continue
         
-        # Get the top keywords for this topic
         keywords = topic_model.get_topic(topic_id)
         if keywords:
-            # Extract just the word part from the (word, probability) tuple
             word_list = [word for word, prob in keywords]
-            topic_name = topic_info[topic_info['Topic'] == topic_id]['Name'].values[0]
+            
+            # Prefer LLM generated name, fallback to simple filtering
+            clean_name = generated_names.get(str(topic_id)) or generated_names.get(int(topic_id))
+            if not clean_name:
+                meaningful_words = [w for w in word_list if w.lower() not in STOPWORDS and len(w) > 2]
+                clean_name = ", ".join(meaningful_words[:3]).title() if meaningful_words else f"Topic {topic_id}"
+            
             topics_list.append({
-                "topic_id": topic_id,
-                "name": topic_name,
+                "topic_id": int(topic_id),
+                "name": clean_name,
                 "keywords": word_list
             })
 

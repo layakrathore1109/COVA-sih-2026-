@@ -11,7 +11,7 @@ A RAG-based prototype with three modules:
 - pdfplumber (digital PDF text extraction)
 - pytesseract (OCR for scanned PDFs)
 - ChromaDB (vector store, use its built-in embedding function — no separate embeddings API)
-google-generativeai SDK (model: gemini-3-pro-preview) for all LLM calls
+google-generativeai SDK (model: gemini-3.1-pro-preview) for all LLM calls
 - BERTopic + wordcloud for topic modeling
 - python-docx for report generation
 - React for the frontend

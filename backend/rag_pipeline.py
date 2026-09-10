@@ -1,7 +1,6 @@
 import os
 import time
 from dotenv import load_dotenv
-from google import genai
 try:
     from vector_store import get_chroma_client, get_or_create_collection
     from gap_detector import check_coverage
@@ -87,45 +86,17 @@ Question:
 {question}
 """
     
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        print("Warning: GEMINI_API_KEY not found in environment variables.")
-        
-    client = genai.Client(api_key=api_key)
-    
-    provider_used = "gemini"
     try:
-        # Use gemini-3.7-flash instead of deprecated 2.5 series
-        interaction = client.interactions.create(
-            model="gemini-3.7-flash",
-            input=prompt
-        )
-        answer = interaction.output_text
+        from backend.llm_utils import call_gemini_with_fallback
+    except ImportError:
+        from llm_utils import call_gemini_with_fallback
+
+    try:
+        response_data = call_gemini_with_fallback(prompt)
+        answer = response_data["text"]
+        provider_used = response_data["model"]
     except Exception as e:
-        error_str = str(e).lower()
-        if "429" in error_str or "quota" in error_str or "rate limit" in error_str:
-            print("Gemini API quota exceeded. Falling back to Groq...")
-            groq_key = os.getenv("GROQ_API_KEY")
-            if not groq_key:
-                raise Exception(f"Gemini API failed with 429, and GROQ_API_KEY is not set. Original error: {e}")
-            
-            import requests
-            headers = {
-                "Authorization": f"Bearer {groq_key}",
-                "Content-Type": "application/json"
-            }
-            data = {
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}]
-            }
-            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data)
-            if resp.status_code == 200:
-                answer = resp.json()["choices"][0]["message"]["content"]
-                provider_used = "groq"
-            else:
-                raise Exception(f"Groq API fallback failed: {resp.text}")
-        else:
-            raise e
+        raise Exception(f"Gemini API failed: {e}")
     
     # 4. Measure elapsed time
     end_time = time.time()

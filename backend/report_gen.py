@@ -25,7 +25,6 @@ def extract_fields(text):
     Parses and returns the JSON.
     """
     print("Extracting fields using Gemini...")
-    client = genai.Client(api_key=api_key)
     
     prompt = f"""
     Analyze the following text and extract the key information.
@@ -45,29 +44,51 @@ def extract_fields(text):
     Do not include markdown blocks like ```json or ``` in your response, just the raw JSON object. Ensure all properties are present even if the value is null or empty.
     
     Text to analyze:
-    {text[:30000]}
+    {text}
     """
-    
+
     try:
-        response = client.interactions.create(
-            model='gemini-3.7-flash',
-            input=prompt
-        )
-        response_text = response.output_text.strip()
-        
+        from backend.llm_utils import call_gemini_with_fallback
+    except ImportError:
+        from llm_utils import call_gemini_with_fallback
+
+    try:
+        response_data = call_gemini_with_fallback(prompt)
+        response_text = response_data["text"]
+    except Exception as e:
+        print(f"Error: {e}")
+        return {
+            "subsidiary_name": "Unknown",
+            "report_year": "Unknown",
+            "executive_summary": "Data not available.",
+            "operational_and_production_metrics": [],
+            "financial_overview": {"revenue": "N/A", "capital_expenditure": "N/A", "operating_costs": "N/A", "margins": "N/A"},
+            "exploration_and_development_projects": [],
+            "key_risks_and_challenges": [],
+            "strategic_outlook_and_targets": "Data not available.",
+            "key_highlights": []
+        }
+
+    try:
         # Remove markdown formatting if Gemini included it
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        if response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
+        import re
+        
+        # Extract content between ```json and ``` if present
+        match = re.search(r'```(?:json)?(.*?)```', response_text, re.DOTALL | re.IGNORECASE)
+        if match:
+            response_text = match.group(1)
             
+        # Clean trailing commas
+        response_text = re.sub(r',\s*([\]}])', r'\1', response_text)
+        
         data = json.loads(response_text.strip())
         print("Successfully extracted and parsed JSON fields.")
         return data
     except Exception as e:
-        print(f"Error during field extraction: {e}")
+        print(f"Error during JSON parsing: {e}")
+        print("--- RAW RESPONSE START ---")
+        print(response_text)
+        print("--- RAW RESPONSE END ---")
         # Return fallback structure on failure
         return {
             "subsidiary_name": "Unknown",
@@ -95,11 +116,11 @@ def generate_report(file_path):
         text, _ = extract_excel(file_path)
     else:
         print(f"Unsupported file format for {file_path}. Use PDF, XLSX, or CSV.")
-        return None
+        return (None, None)
         
     if not text:
         print("Failed to extract any text from the file.")
-        return None
+        return (None, None)
         
     print(f"Extracted {len(text)} characters of text.")
     
@@ -120,7 +141,7 @@ def generate_report(file_path):
     sub_name = fields.get('subsidiary_name', 'Unknown Subsidiary')
     report_year = fields.get('report_year', 'Unknown Year')
     
-    title = doc.add_heading(f"Corporate Report: {sub_name}", 0)
+    title = doc.add_heading(f"Corporate Report: {sub_name}", 1)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     subtitle = doc.add_paragraph(f"Report Year: {report_year}")
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -230,10 +251,10 @@ def generate_report(file_path):
     try:
         doc.save(output_path)
         print(f"Report successfully saved to {output_path}")
-        return output_path
+        return (output_path, fields)
     except Exception as e:
         print(f"Error saving report: {e}")
-        return None
+        return (None, None)
 
 if __name__ == "__main__":
     # Find a sample file in the data folder to test

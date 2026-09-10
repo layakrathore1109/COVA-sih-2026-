@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team COVA — SIH 2026</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i data-lucide="blocks" class="logo-icon"></i>
+                <div class="logo-text">
+                    <h2>COVA</h2>
+                    <p>SIH 2026</p>
+                </div>
+            </div>
+            
+            <nav class="side-nav">
+                <button class="nav-btn active" data-target="dashboard">
+                    <i data-lucide="layout-dashboard"></i> Dashboard
+                </button>
+                <button class="nav-btn" data-target="ask">
+                    <i data-lucide="message-square-text"></i> Ask AI
+                </button>
+                <button class="nav-btn" data-target="summarize">
+                    <i data-lucide="file-text"></i> Summarize
+                </button>
+                <button class="nav-btn" data-target="topics">
+                    <i data-lucide="network"></i> Topic Explorer
+                </button>
+                <button class="nav-btn" data-target="report">
+                    <i data-lucide="file-bar-chart-2"></i> Report Generation
+                </button>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <p>CMPDI AI Reporting</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <div class="main-wrapper">
+            <header class="top-header">
+                <h1 id="page-title">Dashboard</h1>
+            </header>
+            
+            <main id="app-content">
+                <!-- Views are rendered here -->
+            </main>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
