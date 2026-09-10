@@ -56,7 +56,8 @@ def ask(question):
         return {
             "answer": gap_check['message'],
             "sources": [],
-            "elapsed_seconds": time.time() - start_time
+            "elapsed_seconds": time.time() - start_time,
+            "provider": "none"
         }
     
     # 2. Build context string
@@ -92,13 +93,39 @@ Question:
         
     client = genai.Client(api_key=api_key)
     
-    # Use gemini-3.7-flash instead of deprecated 2.5 series
-    interaction = client.interactions.create(
-        model="gemini-3.7-flash",
-        input=prompt
-    )
-    
-    answer = interaction.output_text
+    provider_used = "gemini"
+    try:
+        # Use gemini-3.7-flash instead of deprecated 2.5 series
+        interaction = client.interactions.create(
+            model="gemini-3.7-flash",
+            input=prompt
+        )
+        answer = interaction.output_text
+    except Exception as e:
+        error_str = str(e).lower()
+        if "429" in error_str or "quota" in error_str or "rate limit" in error_str:
+            print("Gemini API quota exceeded. Falling back to Groq...")
+            groq_key = os.getenv("GROQ_API_KEY")
+            if not groq_key:
+                raise Exception(f"Gemini API failed with 429, and GROQ_API_KEY is not set. Original error: {e}")
+            
+            import requests
+            headers = {
+                "Authorization": f"Bearer {groq_key}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}]
+            }
+            resp = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=data)
+            if resp.status_code == 200:
+                answer = resp.json()["choices"][0]["message"]["content"]
+                provider_used = "groq"
+            else:
+                raise Exception(f"Groq API fallback failed: {resp.text}")
+        else:
+            raise e
     
     # 4. Measure elapsed time
     end_time = time.time()
@@ -108,7 +135,8 @@ Question:
     return {
         "answer": answer,
         "sources": list(sources_set),
-        "elapsed_seconds": elapsed_seconds
+        "elapsed_seconds": elapsed_seconds,
+        "provider": provider_used
     }
 
 if __name__ == "__main__":
